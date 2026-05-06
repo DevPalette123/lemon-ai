@@ -486,5 +486,155 @@ function showErr(m) {
 function hideErr() {
   document.getElementById('errBox').classList.remove('on');
 }
+// ============================================================
+// History
+// ============================================================
+function saveHist(data, imgSrc) {
+  try {
+    var hist = JSON.parse(localStorage.getItem('lemonHist') || '[]');
+    hist.unshift({
+      date: new Date().toLocaleString('ar-OM'),
+      status: data.status,
+      disease: data.disease || null,
+      confidence: data.confidence,
+      description: data.description,
+      img: imgSrc
+    });
+    if (hist.length > 20) hist = hist.slice(0, 20);
+    localStorage.setItem('lemonHist', JSON.stringify(hist));
+  } catch (e) {
+    console.log('History save failed:', e);
+  }
+}
 
+function renderHist() {
+  try {
+    var hist = JSON.parse(localStorage.getItem('lemonHist') || '[]');
+    var container = document.getElementById('histList');
+    if (!container) return;
+
+    if (hist.length === 0) {
+      container.innerHTML = '<p style="text-align:center;opacity:0.5">لا يوجد سجل بعد</p>';
+      return;
+    }
+
+    container.innerHTML = hist.map(function (h, i) {
+      return '<div class="hist-item">' +
+        '<img src="' + h.img + '" onerror="this.style.display=\'none\'">' +
+        '<div class="hist-info">' +
+        '<span class="hist-status ' + (h.status === 'سليمة' ? 'ok' : 'bad') + '">' + h.status + '</span>' +
+        '<span>' + (h.disease || 'لا يوجد مرض') + '</span>' +
+        '<span class="hist-date">' + h.date + '</span>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    console.log('Render hist failed:', e);
+  }
+}
+
+function clearHist() {
+  if (confirm('هل تريد حذف كل السجل؟')) {
+    localStorage.removeItem('lemonHist');
+    renderHist();
+  }
+}
+
+// ============================================================
+// Show Result
+// ============================================================
+function showResult(data) {
+  var card = document.getElementById('resCard');
+  if (!card) return;
+
+  var statusColor = data.status === 'سليمة' ? '#22c55e' : '#ef4444';
+  var statusIcon = data.status === 'سليمة' ? '✅' : '⚠️';
+
+  card.innerHTML =
+    '<div class="res-header" style="border-color:' + statusColor + '">' +
+    '<span class="res-icon">' + statusIcon + '</span>' +
+    '<span class="res-status" style="color:' + statusColor + '">' + data.status + '</span>' +
+    '<span class="res-conf">دقة التشخيص: ' + (data.confidence || 0) + '%</span>' +
+    '</div>' +
+    (data.disease ? '<div class="res-disease">🦠 ' + data.disease + (data.diseaseEn ? ' (' + data.diseaseEn + ')' : '') + '</div>' : '') +
+    '<div class="res-desc">' + (data.description || '') + '</div>' +
+    (data.symptoms && data.symptoms.length ? '<div class="res-section"><b>الأعراض:</b><ul>' + data.symptoms.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ul></div>' : '') +
+    (data.recommendations && data.recommendations.length ? '<div class="res-section"><b>التوصيات:</b><ul>' + data.recommendations.map(function (r) { return '<li>' + r + '</li>'; }).join('') + '</ul></div>' : '') +
+    (data.severity ? '<div class="res-severity">شدة الإصابة: <b>' + data.severity + '</b></div>' : '');
+
+  card.classList.add('on');
+}
+
+// ============================================================
+// Drag & Drop helpers
+// ============================================================
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadCard').classList.add('drag');
+}
+
+function onDragLeave() {
+  document.getElementById('uploadCard').classList.remove('drag');
+}
+
+// ============================================================
+// Tab Switch
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-pane').forEach(function (p) {
+    p.classList.remove('active');
+  });
+
+  var btn = document.querySelector('[data-tab="' + tab + '"]');
+  var pane = document.getElementById('tab-' + tab);
+  if (btn) btn.classList.add('active');
+  if (pane) pane.classList.add('active');
+
+  if (tab !== 'c') stopCam();
+  if (tab === 'h') renderHist();
+}
+
+// ============================================================
+// Camera
+// ============================================================
+function startCam() {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
+    .then(function (s) {
+      stream = s;
+      var v = document.getElementById('vid');
+      v.srcObject = s;
+      v.play();
+    })
+    .catch(function (e) {
+      showErr('لا يمكن الوصول للكاميرا: ' + e.message);
+    });
+}
+
+function stopCam() {
+  if (stream) {
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null;
+  }
+}
+
+function flipCam() {
+  facing = facing === 'environment' ? 'user' : 'environment';
+  stopCam();
+  startCam();
+}
+
+// ============================================================
+// Reset
+// ============================================================
+function reset() {
+  imgB64 = null;
+  document.getElementById('uploadCard').classList.remove('hidden');
+  document.getElementById('prevCard').classList.add('hidden');
+  document.getElementById('resCard').classList.remove('on');
+  document.getElementById('featGrid').classList.remove('hidden');
+  hideErr();
+}
 </script>
