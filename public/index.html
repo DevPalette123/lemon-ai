@@ -424,15 +424,24 @@ function analyze() {
     body: JSON.stringify({ image: imgB64 })
   })
     .then(r => r.json())
-    .then(data => {
-      if (data.error) throw new Error(data.error);
+   .then(data => {
+  if (data.error) throw new Error(data.error);
 
-      playBeep(data.status === 'سليمة' ? 'ok' : 'bad');
+  // إذا كان description يحتوي JSON خام، حاول تحليله
+  if (data.status === 'غير محدد' && data.description) {
+    try {
+      const parsed = JSON.parse(data.description);
+      data = parsed;
+    } catch (e) {
+      // ابقَ كما هو
+    }
+  }
 
-      currentResult = data;
-      saveHist(data, document.getElementById('prevImg').src);
-      showResult(data);
-    })
+  playBeep(data.status === 'سليمة' ? 'ok' : 'bad');
+  currentResult = data;
+  saveHist(data, document.getElementById('prevImg').src);
+  showResult(data);
+})
     .catch(e => {
       showErr('خطأ في التحليل: ' + e.message);
     })
