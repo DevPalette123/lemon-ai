@@ -111,6 +111,11 @@ export default async function handler(req, res) {
     // =========================
     const text =
       geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text =
+  geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+// 👇 أضف هذا
+console.log('RAW TEXT FROM GEMINI:', text);
 
     if (!text) {
       return res.status(500).json({
