@@ -424,8 +424,25 @@ function analyze() {
     body: JSON.stringify({ image: imgB64 })
   })
     .then(r => r.json())
-   .then(data => {
+.then(data => {
   if (data.error) throw new Error(data.error);
+
+  // إذا رجع غير محدد وdescription فيه JSON — حلله
+  if (data.description && typeof data.description === 'string') {
+    const match = data.description.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (parsed.status) data = parsed;
+      } catch (e) {}
+    }
+  }
+
+  playBeep(data.status === 'سليمة' ? 'ok' : 'bad');
+  currentResult = data;
+  saveHist(data, document.getElementById('prevImg').src);
+  showResult(data);
+})
 
   // إذا كان description يحتوي JSON خام، حاول تحليله
   if (data.status === 'غير محدد' && data.description) {
