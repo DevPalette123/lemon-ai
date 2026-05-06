@@ -57,8 +57,12 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Gemini Error: ' + geminiData.error.message });
     }
 
-    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
+   // gemini-2.5-flash يرجع parts متعددة — نجمع كلها
+const parts = geminiData.candidates?.[0]?.content?.parts || [];
+const text = parts
+  .filter(p => p.text && !p.thought)
+  .map(p => p.text)
+  .join('');
     if (!text) {
       return res.status(500).json({ error: 'No text returned from Gemini', raw: geminiData });
     }
