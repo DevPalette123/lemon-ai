@@ -1,4 +1,5 @@
-export default async function handler(req, res) {
+// ✅ غيّره إلى
+module.exports = async function handler(req, res) {
   // =========================
   // CORS
   // =========================
