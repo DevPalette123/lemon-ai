@@ -367,7 +367,39 @@ function onDrop(e) {
     processFile(e.dataTransfer.files[0]);
   }
 }
+// ============================================================
+// Sound Feedback
+// ============================================================
+function playBeep(type) {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var oscillator = ctx.createOscillator();
+    var gainNode = ctx.createGain();
 
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    if (type === 'ok') {
+      // صوت إيجابي — نغمتان صاعدتان
+      oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+      oscillator.frequency.setValueAtTime(900, ctx.currentTime + 0.15);
+      oscillator.type = 'sine';
+    } else {
+      // صوت تحذيري — نغمة منخفضة
+      oscillator.frequency.setValueAtTime(300, ctx.currentTime);
+      oscillator.frequency.setValueAtTime(200, ctx.currentTime + 0.2);
+      oscillator.type = 'sawtooth';
+    }
+
+    gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.4);
+  } catch (e) {
+    console.log('Audio not supported:', e);
+  }
+}
 // ============================================================
 // تحليل الصورة (FIXED SAFETY)
 // ============================================================
