@@ -122,7 +122,14 @@ export default async function handler(req, res) {
     // =========================
     // Clean JSON
     // =========================
-    const clean = text.replace(/```json|```/g, '').trim();
+    // استخراج JSON من النص بشكل أقوى
+let clean = text.replace(/```json|```/g, '').trim();
+
+// إذا كان JSON مدفون داخل نص، استخرجه
+const jsonMatch = clean.match(/\{[\s\S]*\}/);
+if (jsonMatch) {
+  clean = jsonMatch[0];
+}
 
     let result;
 
