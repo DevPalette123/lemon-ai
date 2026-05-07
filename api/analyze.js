@@ -13,9 +13,19 @@ module.exports = async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'مفتاح API غير موجود' });
 
-    const prompt = `You are an expert in Omani lemon diseases. Analyze this image.
-Reply with ONLY this JSON, no other text:
-{"status":"مريضة","disease":"name","diseaseEn":"name","confidence":90,"type":"مرض","symptoms":["s1","s2"],"recommendations":["r1","r2"],"severity":"متوسط","description":"desc"}`;
+    const prompt = `أنت خبير زراعي متخصص في أمراض الليمون العُماني.
+حلل الصورة وأجب فقط بـ JSON بدون أي نص إضافي:
+{
+"status":"سليمة أو مريضة",
+"disease":"اسم المرض أو null",
+"diseaseEn":"English name or null",
+"confidence":0-100,
+"type":"مرض أو نقص عنصر أو سليمة",
+"symptoms":["عرض1","عرض2"],
+"recommendations":["توصية1","توصية2"],
+"severity":"خفيف أو متوسط أو شديد أو null",
+"description":"وصف مختصر"
+}`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -29,63 +39,49 @@ Reply with ONLY this JSON, no other text:
               { text: prompt }
             ]
           }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 800
-          }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
         })
       }
     );
 
     const rawText = await geminiRes.text();
+
     let geminiData;
     try {
       geminiData = JSON.parse(rawText);
     } catch (err) {
-      return res.status(500).json({ error: 'Gemini parse error', raw: rawText.substring(0, 300) });
+      return res.status(500).json({ error: 'Gemini returned invalid response', raw: rawText });
     }
 
     if (geminiData.error) {
       return res.status(400).json({ error: 'Gemini Error: ' + geminiData.error.message });
     }
 
-    // جمع كل النصوص بدون أي فلترة
-    const parts = geminiData.candidates?.[0]?.content?.parts || [];
-    
-    // إذا لا يوجد parts أرجع البيانات الخام للتشخيص
-    if (!parts.length) {
-      return res.status(500).json({ 
-        error: 'No parts', 
-        candidate: JSON.stringify(geminiData.candidates?.[0]).substring(0, 300)
-      });
+    // gemini-2.5-flash يرجع parts متعددة — نجمع كلها
+const parts = geminiData.candidates?.[0]?.content?.parts || [];
+const text = parts
+  .filter(p => p.text && !p.thought)
+  .map(p => p.text)
+  .join('');
+
+    if (!text) {
+      return res.status(500).json({ error: 'No text returned from Gemini', raw: geminiData });
     }
 
-    let text = parts.map(p => p.text || '').join('');
-
-    if (!text.trim()) {
-      return res.status(500).json({ 
-        error: 'Empty text', 
-        parts_info: parts.map(p => ({ keys: Object.keys(p), textLen: (p.text||'').length }))
-      });
-    }
-
-    // تنظيف وإيجاد JSON
-    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-
-    if (start === -1 || end === -1) {
-      return res.status(500).json({ error: 'No JSON braces found', raw: text.substring(0, 400) });
-    }
+    let clean = text.replace(/```json|```/g, '').trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) clean = jsonMatch[0];
 
     let result;
     try {
-      result = JSON.parse(text.substring(start, end + 1));
+      result = JSON.parse(clean);
     } catch (e) {
-      return res.status(500).json({ 
-        error: 'JSON parse failed', 
-        raw: text.substring(start, start + 400)
+      return res.status(200).json({
+        status: 'غير محدد',
+        confidence: 60,
+        description: clean,
+        symptoms: [],
+        recommendations: []
       });
     }
 
