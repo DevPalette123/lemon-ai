@@ -14,8 +14,8 @@ module.exports = async function handler(req, res) {
     if (!apiKey) return res.status(500).json({ error: 'مفتاح API غير موجود' });
 
     const prompt = `You are an expert in Omani lemon diseases. Analyze this image.
-Reply with ONLY a JSON object, no other text, no markdown, no backticks:
-{"status":"مريضة","disease":"اسم المرض","diseaseEn":"Disease name","confidence":90,"type":"مرض","symptoms":["symptom1","symptom2"],"recommendations":["rec1","rec2"],"severity":"متوسط","description":"brief description"}`;
+Reply with ONLY this JSON, no other text:
+{"status":"مريضة","disease":"name","diseaseEn":"name","confidence":90,"type":"مرض","symptoms":["s1","s2"],"recommendations":["r1","r2"],"severity":"متوسط","description":"desc"}`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -42,40 +42,51 @@ Reply with ONLY a JSON object, no other text, no markdown, no backticks:
     try {
       geminiData = JSON.parse(rawText);
     } catch (err) {
-      return res.status(500).json({ error: 'Gemini parse error' });
+      return res.status(500).json({ error: 'Gemini parse error', raw: rawText.substring(0, 300) });
     }
 
     if (geminiData.error) {
       return res.status(400).json({ error: 'Gemini Error: ' + geminiData.error.message });
     }
 
-    // جمع كل النصوص
+    // جمع كل النصوص بدون أي فلترة
     const parts = geminiData.candidates?.[0]?.content?.parts || [];
-    let text = parts.map(p => p.text || '').join('');
-
-    if (!text) {
-      return res.status(500).json({ error: 'No response from Gemini' });
+    
+    // إذا لا يوجد parts أرجع البيانات الخام للتشخيص
+    if (!parts.length) {
+      return res.status(500).json({ 
+        error: 'No parts', 
+        candidate: JSON.stringify(geminiData.candidates?.[0]).substring(0, 300)
+      });
     }
 
-    // تنظيف
-    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    let text = parts.map(p => p.text || '').join('');
 
-    // إيجاد JSON الكامل — نبحث عن أكبر {} 
-    let result = null;
+    if (!text.trim()) {
+      return res.status(500).json({ 
+        error: 'Empty text', 
+        parts_info: parts.map(p => ({ keys: Object.keys(p), textLen: (p.text||'').length }))
+      });
+    }
+
+    // تنظيف وإيجاد JSON
+    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    
-    if (start !== -1 && end !== -1 && end > start) {
-      try {
-        result = JSON.parse(text.substring(start, end + 1));
-      } catch (e) {
-        return res.status(500).json({ 
-          error: 'JSON parse failed', 
-          raw: text.substring(start, Math.min(start + 300, end + 1))
-        });
-      }
-    } else {
-      return res.status(500).json({ error: 'No JSON found', raw: text.substring(0, 300) });
+
+    if (start === -1 || end === -1) {
+      return res.status(500).json({ error: 'No JSON braces found', raw: text.substring(0, 400) });
+    }
+
+    let result;
+    try {
+      result = JSON.parse(text.substring(start, end + 1));
+    } catch (e) {
+      return res.status(500).json({ 
+        error: 'JSON parse failed', 
+        raw: text.substring(start, start + 400)
+      });
     }
 
     return res.status(200).json(result);
