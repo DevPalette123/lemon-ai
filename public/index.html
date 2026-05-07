@@ -702,17 +702,26 @@ function showResult(data) {
   if (!card) return;
 
   // إصلاح JSON الخام إذا رجع داخل description
-  if (
-    data.status === 'غير محدد' &&
-    data.description
-  ) {
+  if (data.description && typeof data.description === 'string') {
+
+  // استخراج JSON من النص
+  var match = data.description.match(/\{[\s\S]*\}/);
+
+  if (match) {
     try {
-      var parsed = JSON.parse(data.description);
-      data = parsed;
+
+      var parsed = JSON.parse(match[0]);
+
+      // استبدال البيانات إذا كان JSON صحيح
+      if (parsed.status) {
+        data = parsed;
+      }
+
     } catch (e) {
-      console.log('الوصف ليس JSON صالح');
+      console.log('تعذر تحليل JSON');
     }
   }
+}
 
   var statusColor =
     data.status === 'سليمة'
