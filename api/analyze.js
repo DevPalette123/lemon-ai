@@ -13,12 +13,9 @@ module.exports = async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'مفتاح API غير موجود' });
 
-    const prompt = `أنت خبير زراعي متخصص في أمراض الليمون العُماني.
-حلل الصورة واكتب JSON فقط بدون أي كلام قبله أو بعده:
-{"status":"مريضة","disease":"اسم المرض","diseaseEn":"Disease name","confidence":95,"type":"مرض","symptoms":["عرض1","عرض2"],"recommendations":["توصية1","توصية2"],"severity":"متوسط","description":"وصف الحالة"}
-
-إذا الشجرة سليمة:
-{"status":"سليمة","disease":null,"diseaseEn":null,"confidence":95,"type":"سليمة","symptoms":[],"recommendations":["استمر في العناية الجيدة"],"severity":null,"description":"الشجرة تبدو بصحة جيدة"}`;
+    const prompt = `You are an expert in Omani lemon diseases. Analyze this image.
+Reply with ONLY a JSON object, no other text, no markdown, no backticks:
+{"status":"مريضة","disease":"اسم المرض","diseaseEn":"Disease name","confidence":90,"type":"مرض","symptoms":["symptom1","symptom2"],"recommendations":["rec1","rec2"],"severity":"متوسط","description":"brief description"}`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -34,69 +31,51 @@ module.exports = async function handler(req, res) {
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 1000,
-            responseMimeType: "application/json"
+            maxOutputTokens: 800
           }
         })
       }
     );
 
     const rawText = await geminiRes.text();
-
     let geminiData;
     try {
       geminiData = JSON.parse(rawText);
     } catch (err) {
-      return res.status(500).json({ error: 'Gemini returned invalid response' });
+      return res.status(500).json({ error: 'Gemini parse error' });
     }
 
     if (geminiData.error) {
       return res.status(400).json({ error: 'Gemini Error: ' + geminiData.error.message });
     }
 
-    // gemini-2.5-flash له Thinking mode — نتجاهل thought ونأخذ النص فقط
+    // جمع كل النصوص
     const parts = geminiData.candidates?.[0]?.content?.parts || [];
-    let text = '';
-
-    for (const part of parts) {
-      if (part.text && !part.thought) {
-        text += part.text;
-      }
-    }
+    let text = parts.map(p => p.text || '').join('');
 
     if (!text) {
-      return res.status(500).json({ error: 'No text returned from Gemini' });
+      return res.status(500).json({ error: 'No response from Gemini' });
     }
 
-    // تنظيف شامل
-    let clean = text
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
+    // تنظيف
+    text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-    // استخراج أول JSON كامل
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      clean = jsonMatch[0];
-    }
-
-    let result;
-    try {
-      result = JSON.parse(clean);
-    } catch (e) {
-      // محاولة أخيرة — إصلاح JSON المكسور
+    // إيجاد JSON الكامل — نبحث عن أكبر {} 
+    let result = null;
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    
+    if (start !== -1 && end !== -1 && end > start) {
       try {
-        const fixed = clean
-          .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']')
-          .replace(/:\s*undefined/g, ': null');
-        result = JSON.parse(fixed);
-      } catch (e2) {
-        return res.status(500).json({
-          error: 'JSON parse failed',
-          raw: clean.substring(0, 500)
+        result = JSON.parse(text.substring(start, end + 1));
+      } catch (e) {
+        return res.status(500).json({ 
+          error: 'JSON parse failed', 
+          raw: text.substring(start, Math.min(start + 300, end + 1))
         });
       }
+    } else {
+      return res.status(500).json({ error: 'No JSON found', raw: text.substring(0, 300) });
     }
 
     return res.status(200).json(result);
