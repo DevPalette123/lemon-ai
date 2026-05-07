@@ -316,8 +316,9 @@ async function processFile(file) {
 
   imgB64 = await toBase64(file);
 
-  // عرض الصورة من base64 مباشرة (وليس blob)
-  document.getElementById('prevImg').src = 'data:' + mimeType + ';base64,' + imgB64;
+  document.getElementById('prevImg').src =
+    'data:' + mimeType + ';base64,' + imgB64;
+
   document.getElementById('uploadCard').classList.add('hidden');
   document.getElementById('prevCard').classList.remove('hidden');
   document.getElementById('resCard').classList.remove('on');
@@ -331,22 +332,38 @@ function toBase64(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
+
     img.onload = function () {
       const canvas = document.createElement('canvas');
-      // تصغير الصورة لـ 800px كحد أقصى
-      let w = img.width, h = img.height;
+
+      let w = img.width;
+      let h = img.height;
+
       const max = 800;
+
       if (w > max || h > max) {
-        if (w > h) { h = Math.round(h * max / w); w = max; }
-        else { w = Math.round(w * max / h); h = max; }
+        if (w > h) {
+          h = Math.round(h * max / w);
+          w = max;
+        } else {
+          w = Math.round(w * max / h);
+          h = max;
+        }
       }
+
       canvas.width = w;
       canvas.height = h;
+
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
       URL.revokeObjectURL(url);
-      const data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+
+      const data =
+        canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+
       resolve(data);
     };
+
     img.onerror = reject;
     img.src = url;
   });
@@ -368,6 +385,7 @@ function onFile(e) {
 function onDrop(e) {
   e.preventDefault();
   onDragLeave();
+
   if (e.dataTransfer.files && e.dataTransfer.files[0]) {
     processFile(e.dataTransfer.files[0]);
   }
@@ -387,24 +405,51 @@ function onDragLeave() {
 // ============================================================
 function playBeep(type) {
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = new (window.AudioContext ||
+      window.webkitAudioContext)();
+
     var oscillator = ctx.createOscillator();
     var gainNode = ctx.createGain();
+
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
+
     if (type === 'ok') {
-      oscillator.frequency.setValueAtTime(600, ctx.currentTime);
-      oscillator.frequency.setValueAtTime(900, ctx.currentTime + 0.15);
+      oscillator.frequency.setValueAtTime(
+        600,
+        ctx.currentTime
+      );
+
+      oscillator.frequency.setValueAtTime(
+        900,
+        ctx.currentTime + 0.15
+      );
+
       oscillator.type = 'sine';
     } else {
-      oscillator.frequency.setValueAtTime(300, ctx.currentTime);
-      oscillator.frequency.setValueAtTime(200, ctx.currentTime + 0.2);
+      oscillator.frequency.setValueAtTime(
+        300,
+        ctx.currentTime
+      );
+
+      oscillator.frequency.setValueAtTime(
+        200,
+        ctx.currentTime + 0.2
+      );
+
       oscillator.type = 'sawtooth';
     }
+
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.001,
+      ctx.currentTime + 0.4
+    );
+
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + 0.4);
+
   } catch (e) {
     console.log('Audio not supported:', e);
   }
@@ -422,6 +467,7 @@ function analyze() {
   hideErr();
 
   var btn = document.getElementById('aBtn');
+
   btn.disabled = true;
   btn.innerHTML = '⏳ جاري التحليل...';
 
@@ -430,40 +476,38 @@ function analyze() {
 
   fetch(WORKER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: imgB64 })
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      image: imgB64
+    })
   })
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) throw new Error(data.error);
 
-      // إذا رجع JSON خام داخل description — حلله
-      if (data.description && typeof data.description === 'string') {
-        const match = data.description.match(/\{[\s\S]*\}/);
-        if (match) {
-          try {
-            const parsed = JSON.parse(match[0]);
-            if (parsed.status) data = parsed;
-          } catch (e) {}
-        }
-      }
+  .then(r => r.json())
 
-      playBeep(data.status === 'سليمة' ? 'ok' : 'bad');
-      currentResult = data;
+  .then(data => {
+    if (data.error) {
+      throw new Error(data.error);
+    }
 
-      // حفظ base64 مباشرة في السجل
-      saveHist(data, 'data:' + mimeType + ';base64,' + imgB64);
-      showResult(data);
-    })
-    .catch(e => {
-      showErr('خطأ في التحليل: ' + e.message);
-    })
-    .finally(() => {
-      btn.disabled = false;
-      btn.innerHTML = '🔍 حلّل مجدداً';
-      document.getElementById('scanLine').classList.remove('on');
-      document.getElementById('scanOv').classList.remove('on');
-    });
+    showResult(data);
+  })
+
+  .catch(e => {
+    showErr('خطأ في التحليل: ' + e.message);
+  })
+
+  .finally(() => {
+    btn.disabled = false;
+    btn.innerHTML = '🔍 حلّل مجدداً';
+
+    document.getElementById('scanLine')
+      .classList.remove('on');
+
+    document.getElementById('scanOv')
+      .classList.remove('on');
+  });
 }
 
 // ============================================================
@@ -472,46 +516,75 @@ function analyze() {
 function snap() {
   var v = document.getElementById('vid');
   var c = document.getElementById('cnv');
+
   if (!v.videoWidth) {
     showErr('الكاميرا لم تبدأ بعد');
     return;
   }
+
   c.width = v.videoWidth;
   c.height = v.videoHeight;
+
   c.getContext('2d').drawImage(v, 0, 0);
+
   c.toBlob(function (blob) {
+
     if (!blob) {
       showErr('فشل التقاط الصورة');
       return;
     }
+
     stopCam();
     switchTab('g');
-    processFile(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
+
+    processFile(
+      new File([blob], 'photo.jpg', {
+        type: 'image/jpeg'
+      })
+    );
+
   }, 'image/jpeg', 0.95);
 }
 
 function startCam() {
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
-    .then(function (s) {
-      stream = s;
-      var v = document.getElementById('vid');
-      v.srcObject = s;
-      v.play();
-    })
-    .catch(function (e) {
-      showErr('لا يمكن الوصول للكاميرا: ' + e.message);
-    });
+  navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: facing
+    }
+  })
+
+  .then(function (s) {
+    stream = s;
+
+    var v = document.getElementById('vid');
+
+    v.srcObject = s;
+    v.play();
+  })
+
+  .catch(function (e) {
+    showErr(
+      'لا يمكن الوصول للكاميرا: ' + e.message
+    );
+  });
 }
 
 function stopCam() {
   if (stream) {
-    stream.getTracks().forEach(function (t) { t.stop(); });
+    stream.getTracks().forEach(function (t) {
+      t.stop();
+    });
+
     stream = null;
   }
 }
 
 function flipCam() {
-  facing = facing === 'environment' ? 'user' : 'environment';
+  facing =
+    facing === 'environment'
+      ? 'user'
+      : 'environment';
+
   stopCam();
   startCam();
 }
@@ -525,7 +598,8 @@ function showErr(m) {
 }
 
 function hideErr() {
-  document.getElementById('errBox').classList.remove('on');
+  document.getElementById('errBox')
+    .classList.remove('on');
 }
 
 // ============================================================
@@ -533,7 +607,10 @@ function hideErr() {
 // ============================================================
 function saveHist(data, imgSrc) {
   try {
-    var hist = JSON.parse(localStorage.getItem('lemonHist') || '[]');
+    var hist = JSON.parse(
+      localStorage.getItem('lemonHist') || '[]'
+    );
+
     hist.unshift({
       date: new Date().toLocaleString('ar-OM'),
       status: data.status,
@@ -542,8 +619,16 @@ function saveHist(data, imgSrc) {
       description: data.description,
       img: imgSrc
     });
-    if (hist.length > 20) hist = hist.slice(0, 20);
-    localStorage.setItem('lemonHist', JSON.stringify(hist));
+
+    if (hist.length > 20) {
+      hist = hist.slice(0, 20);
+    }
+
+    localStorage.setItem(
+      'lemonHist',
+      JSON.stringify(hist)
+    );
+
   } catch (e) {
     console.log('History save failed:', e);
   }
@@ -551,23 +636,50 @@ function saveHist(data, imgSrc) {
 
 function renderHist() {
   try {
-    var hist = JSON.parse(localStorage.getItem('lemonHist') || '[]');
-    var container = document.getElementById('histList');
+    var hist = JSON.parse(
+      localStorage.getItem('lemonHist') || '[]'
+    );
+
+    var container =
+      document.getElementById('histList');
+
     if (!container) return;
+
     if (hist.length === 0) {
-      container.innerHTML = '<p style="text-align:center;opacity:0.5">لا يوجد سجل بعد</p>';
+      container.innerHTML =
+        '<p style="text-align:center;opacity:0.5">لا يوجد سجل بعد</p>';
+
       return;
     }
+
     container.innerHTML = hist.map(function (h) {
-      return '<div class="hist-item">' +
-        '<img src="' + h.img + '" onerror="this.style.display=\'none\'">' +
+
+      return (
+        '<div class="hist-item">' +
+
+        '<img src="' + h.img +
+        '" onerror="this.style.display=\'none\'">' +
+
         '<div class="hist-info">' +
-        '<span class="hist-status ' + (h.status === 'سليمة' ? 'ok' : 'bad') + '">' + h.status + '</span>' +
-        '<span>' + (h.disease || 'لا يوجد مرض') + '</span>' +
-        '<span class="hist-date">' + h.date + '</span>' +
+
+        '<span class="hist-status ' +
+        (h.status === 'سليمة' ? 'ok' : 'bad') +
+        '">' + h.status + '</span>' +
+
+        '<span>' +
+        (h.disease || 'لا يوجد مرض') +
+        '</span>' +
+
+        '<span class="hist-date">' +
+        h.date +
+        '</span>' +
+
         '</div>' +
-        '</div>';
+        '</div>'
+      );
+
     }).join('');
+
   } catch (e) {
     console.log('Render hist failed:', e);
   }
@@ -584,56 +696,173 @@ function clearHist() {
 // Show Result
 // ============================================================
 function showResult(data) {
+
   var card = document.getElementById('resCard');
+
   if (!card) return;
 
-  var statusColor = data.status === 'سليمة' ? '#22c55e' : '#ef4444';
-  var statusIcon = data.status === 'سليمة' ? '✅' : '⚠️';
+  // إصلاح JSON الخام إذا رجع داخل description
+  if (
+    data.status === 'غير محدد' &&
+    data.description
+  ) {
+    try {
+      var parsed = JSON.parse(data.description);
+      data = parsed;
+    } catch (e) {
+      console.log('الوصف ليس JSON صالح');
+    }
+  }
+
+  var statusColor =
+    data.status === 'سليمة'
+      ? '#22c55e'
+      : '#ef4444';
+
+  var statusIcon =
+    data.status === 'سليمة'
+      ? '✅'
+      : '⚠️';
 
   card.innerHTML =
-    '<div class="res-header" style="border-color:' + statusColor + '">' +
-    '<span class="res-icon">' + statusIcon + '</span>' +
-    '<span class="res-status" style="color:' + statusColor + '">' + data.status + '</span>' +
-    '<span class="res-conf">دقة التشخيص: ' + (data.confidence || 0) + '%</span>' +
+
+    '<div class="res-header" style="border-color:' +
+    statusColor +
+    '">' +
+
+    '<span class="res-icon">' +
+    statusIcon +
+    '</span>' +
+
+    '<span class="res-status" style="color:' +
+    statusColor +
+    '">' +
+    (data.status || 'غير محدد') +
+    '</span>' +
+
+    '<span class="res-conf">دقة التشخيص: ' +
+    (data.confidence || 0) +
+    '%</span>' +
+
     '</div>' +
-    (data.disease ? '<div class="res-disease">🦠 ' + data.disease + (data.diseaseEn ? ' (' + data.diseaseEn + ')' : '') + '</div>' : '') +
-    '<div class="res-desc">' + (data.description || '') + '</div>' +
-    (data.symptoms && data.symptoms.length ? '<div class="res-section"><b>الأعراض:</b><ul>' +
-      data.symptoms.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ul></div>' : '') +
-    (data.recommendations && data.recommendations.length ? '<div class="res-section"><b>التوصيات:</b><ul>' +
-      data.recommendations.map(function (r) { return '<li>' + r + '</li>'; }).join('') + '</ul></div>' : '') +
-    (data.severity ? '<div class="res-severity">شدة الإصابة: <b>' + data.severity + '</b></div>' : '');
+
+    (data.disease
+      ? '<div class="res-disease">🦠 ' +
+          data.disease +
+          (data.diseaseEn
+            ? ' (' + data.diseaseEn + ')'
+            : '') +
+        '</div>'
+      : '') +
+
+    '<div class="res-desc">' +
+    (data.description || '') +
+    '</div>' +
+
+    (data.symptoms &&
+    data.symptoms.length
+
+      ? '<div class="res-section"><b>الأعراض:</b><ul>' +
+
+        data.symptoms.map(function (s) {
+          return '<li>' + s + '</li>';
+        }).join('') +
+
+        '</ul></div>'
+
+      : '') +
+
+    (data.recommendations &&
+    data.recommendations.length
+
+      ? '<div class="res-section"><b>التوصيات:</b><ul>' +
+
+        data.recommendations.map(function (r) {
+          return '<li>' + r + '</li>';
+        }).join('') +
+
+        '</ul></div>'
+
+      : '') +
+
+    (data.severity
+
+      ? '<div class="res-severity">شدة الإصابة: <b>' +
+          data.severity +
+        '</b></div>'
+
+      : '');
 
   card.classList.add('on');
+
+  // تشغيل الصوت
+  playBeep(
+    data.status === 'سليمة'
+      ? 'ok'
+      : 'bad'
+  );
+
+  // حفظ النتيجة
+  currentResult = data;
+
+  saveHist(
+    data,
+    'data:' + mimeType + ';base64,' + imgB64
+  );
 }
 
 // ============================================================
 // Tab Switch
 // ============================================================
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(function (b) {
-    b.classList.remove('active');
-  });
-  document.querySelectorAll('.tab-pane').forEach(function (p) {
-    p.classList.remove('active');
-  });
-  var btn = document.querySelector('[data-tab="' + tab + '"]');
-  var pane = document.getElementById('tab-' + tab);
+
+  document.querySelectorAll('.tab-btn')
+    .forEach(function (b) {
+      b.classList.remove('active');
+    });
+
+  document.querySelectorAll('.tab-pane')
+    .forEach(function (p) {
+      p.classList.remove('active');
+    });
+
+  var btn = document.querySelector(
+    '[data-tab="' + tab + '"]'
+  );
+
+  var pane = document.getElementById(
+    'tab-' + tab
+  );
+
   if (btn) btn.classList.add('active');
   if (pane) pane.classList.add('active');
+
   if (tab !== 'c') stopCam();
-  if (tab === 'h') renderHist();
+
+  if (tab === 'h') {
+    renderHist();
+  }
 }
 
 // ============================================================
 // Reset
 // ============================================================
 function reset() {
+
   imgB64 = null;
-  document.getElementById('uploadCard').classList.remove('hidden');
-  document.getElementById('prevCard').classList.add('hidden');
-  document.getElementById('resCard').classList.remove('on');
-  document.getElementById('featGrid').classList.remove('hidden');
+
+  document.getElementById('uploadCard')
+    .classList.remove('hidden');
+
+  document.getElementById('prevCard')
+    .classList.add('hidden');
+
+  document.getElementById('resCard')
+    .classList.remove('on');
+
+  document.getElementById('featGrid')
+    .classList.remove('hidden');
+
   hideErr();
 }
 </script>
